@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "352499223787",
+    "project_id": "nexttrain-5cb99",
+    "storage_bucket": "nexttrain-5cb99.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:352499223787:android:3a0538936b015d39b9c2ae",
+        "android_client_info": {
+          "package_name": "nexttrain.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADywkOX-ZJ0f5-LnMlv4njhDYtgXC1i-U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

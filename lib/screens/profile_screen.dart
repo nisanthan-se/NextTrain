@@ -1,0 +1,306 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import '../utils/color_utils.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../services/profile_session.dart';
+
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  static const Color bgColor = Color(0xFF050B12);
+  static const Color cyan = Color(0xFF00F5FF);
+  static const Color purple = Color(0xFFFF00FF);
+
+  String name = 'Loading...';
+  String email = '';
+  String location = 'Sri Lanka';
+  String role = 'NextTrain Premium User';
+  int predictions = 0;
+
+  StreamSubscription<AppUserProfile?>? _profileSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToProfile();
+  }
+
+  void _listenToProfile() {
+    final cachedProfile = ProfileSession.instance.currentProfile;
+    if (cachedProfile != null) {
+      setState(() {
+        name = cachedProfile.name;
+        email = cachedProfile.email;
+        location = cachedProfile.location;
+        role = cachedProfile.role;
+        predictions = cachedProfile.predictions;
+      });
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _profileSub = BackendService.watchCurrentUserProfile().listen((profile) {
+      if (!mounted) return;
+
+      if (profile != null) {
+        ProfileSession.instance.setProfile(profile);
+
+        setState(() {
+          name = profile.name;
+          email = profile.email;
+          location = profile.location;
+          role = profile.role;
+          predictions = profile.predictions;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _profileSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                height: 132,
+                width: 132,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: cyan, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: cyan.withValues(alpha: 0.25),
+                      blurRadius: 24,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.person, size: 70, color: cyan),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                name,
+                style: GoogleFonts.orbitron(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                role,
+                style: GoogleFonts.poppins(
+                  color: Colors.white60,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _statsRow(),
+              const SizedBox(height: 24),
+              _infoCard(icon: Icons.email_outlined, title: 'Email', value: email),
+              const SizedBox(height: 12),
+              _infoCard(icon: Icons.location_on_outlined, title: 'Location', value: location),
+              const SizedBox(height: 12),
+              _infoCard(icon: Icons.history, title: 'Predictions', value: '$predictions predictions'),
+              const SizedBox(height: 24),
+              _actionButton(
+                icon: Icons.edit,
+                title: 'Edit Profile',
+                color: cyan,
+                onTap: () => _showEditDialog(context),
+              ),
+              const SizedBox(height: 12),
+              _actionButton(
+                icon: Icons.settings,
+                title: 'Settings',
+                color: purple,
+                onTap: () => _showSnackBar(context, 'Settings coming soon'),
+              ),
+              const SizedBox(height: 12),
+              _actionButton(
+                icon: Icons.logout,
+                title: 'Logout',
+                color: Colors.redAccent,
+                onTap: () => _showSnackBar(context, 'You have been logged out'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statsRow() {
+    return Row(
+      children: [
+        Expanded(child: _statCard(label: 'Accuracy', value: '94%', color: cyan)),
+        const SizedBox(width: 12),
+        Expanded(child: _statCard(label: 'Active Trips', value: '12', color: purple)),
+      ],
+    );
+  }
+
+  Widget _statCard({required String label, required String value, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: Colors.white.withValues(alpha: 0.03),
+      ),
+      child: Column(
+        children: [
+          Text(value, style: GoogleFonts.orbitron(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoCard({required IconData icon, required String title, required String value}) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cyan.withValues(alpha: 0.2)),
+        color: Colors.white.withValues(alpha: 0.03),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: cyan),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(value, style: const TextStyle(color: Colors.white, fontSize: 16)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionButton({required IconData icon, required String title, required Color color, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+          color: Colors.white.withValues(alpha: 0.03),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 20),
+            Icon(icon, color: color),
+            const SizedBox(width: 15),
+            Text(title, style: GoogleFonts.poppins(color: Colors.white, fontSize: 16)),
+            const Spacer(),
+            Icon(Icons.arrow_forward_ios, color: color, size: 18),
+            const SizedBox(width: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(BuildContext context) {
+    final nameController = TextEditingController(text: name);
+    final emailController = TextEditingController(text: email);
+    final locationController = TextEditingController(text: location);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: bgColor,
+        title: const Text('Edit Profile', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _dialogField(controller: nameController, label: 'Name'),
+            const SizedBox(height: 10),
+            _dialogField(controller: emailController, label: 'Email'),
+            const SizedBox(height: 10),
+            _dialogField(controller: locationController, label: 'Location'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: cyan),
+            onPressed: () async {
+              final user = FirebaseAuth.instance.currentUser;
+              final currentContext = context;
+              if (user == null) {
+                Navigator.pop(currentContext);
+                return;
+              }
+
+              await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                'name': nameController.text.trim().isNotEmpty ? nameController.text.trim() : name,
+                'email': emailController.text.trim().isNotEmpty ? emailController.text.trim() : email,
+                'location': locationController.text.trim().isNotEmpty ? locationController.text.trim() : location,
+              });
+
+              if (!mounted) return;
+              setState(() {
+                name = nameController.text.trim().isNotEmpty ? nameController.text.trim() : name;
+                email = emailController.text.trim().isNotEmpty ? emailController.text.trim() : email;
+                location = locationController.text.trim().isNotEmpty ? locationController.text.trim() : location;
+              });
+              Navigator.pop(currentContext);
+              _showSnackBar(currentContext, 'Profile updated');
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dialogField({required TextEditingController controller, required String label}) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: cyan)),
+      ),
+    );
+  }
+
+  void _showSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: cyan.withValues(alpha: 0.2)),
+    );
+  }
+}
