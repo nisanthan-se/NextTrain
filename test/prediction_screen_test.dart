@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:traindelay_app/screens/prediction_screen.dart';
+import 'package:traindelay_app/services/backend_service.dart';
 
 void main() {
   group('train delay estimation', () {

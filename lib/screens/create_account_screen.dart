@@ -1,8 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../utils/color_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/auth_fallback.dart';
 import '../services/profile_session.dart';
 import 'home_screen.dart';
 
@@ -20,6 +18,15 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,92 +58,39 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Join NextTrain and start predicting delays',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white60,
-                    fontSize: 15,
-                  ),
+                  style: GoogleFonts.poppins(color: Colors.white60, fontSize: 15),
                 ),
                 const SizedBox(height: 28),
                 _inputField(controller: _nameController, label: 'Name', icon: Icons.person_outline),
                 const SizedBox(height: 14),
                 _inputField(controller: _emailController, label: 'Email', icon: Icons.email_outlined),
                 const SizedBox(height: 14),
-                _inputField(controller: _passwordController, label: 'Password', icon: Icons.lock_outline, obscureText: true),
+                _inputField(
+                  controller: _passwordController,
+                  label: 'Password',
+                  icon: Icons.lock_outline,
+                  obscureText: true,
+                ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () async {
-                      final name = _nameController.text.trim();
-                      final email = _emailController.text.trim();
-                      final password = _passwordController.text.trim();
-                      final currentContext = context;
-
-                      if (name.isEmpty || email.isEmpty || password.isEmpty) {
-                        _showSnackBar(currentContext, 'Please fill all fields');
-                        return;
-                      }
-
-                      try {
-                        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                          email: email,
-                          password: password,
-                        );
-
-                        await BackendService.createUserProfile(
-                          uid: userCredential.user!.uid,
-                          name: name,
-                          email: email,
-                        );
-
-                        ProfileSession.instance.setProfile(
-                          AppUserProfile(
-                            name: name,
-                            email: email,
-                            location: 'Sri Lanka',
-                            role: 'NextTrain Premium User',
-                            predictions: 0,
-                          ),
-                        );
-
-                        if (!mounted) return;
-                        Navigator.pushReplacement(
-                          currentContext,
-                          MaterialPageRoute(builder: (_) => const HomeScreen()),
-                        );
-                        if (!mounted) return;
-                        _showSnackBar(currentContext, 'Account created successfully');
-                      } on FirebaseAuthException catch (e) {
-                        if (!mounted) return;
-                        if (shouldUseDemoAuthFallback(e.message ?? '')) {
-                          Navigator.pushReplacement(
-                            currentContext,
-                            MaterialPageRoute(builder: (_) => const HomeScreen()),
-                          );
-                        } else {
-                          _showSnackBar(currentContext, _mapAuthError(e));
-                        }
-                      } catch (e) {
-                        if (!mounted) return;
-                        if (shouldUseDemoAuthFallback(e.toString())) {
-                          Navigator.pushReplacement(
-                            currentContext,
-                            MaterialPageRoute(builder: (_) => const HomeScreen()),
-                          );
-                        } else {
-                          _showSnackBar(currentContext, 'Account creation failed');
-                        }
-                      }
-                    },
+                    onPressed: _isLoading ? null : _createAccount,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: cyan,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     ),
-                    child: Text(
-                      'CREATE ACCOUNT',
-                      style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                          )
+                        : Text(
+                            'CREATE ACCOUNT',
+                            style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, color: Colors.black),
+                          ),
                   ),
                 ),
               ],
@@ -147,7 +101,68 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     );
   }
 
-  Widget _inputField({required TextEditingController controller, required String label, required IconData icon, bool obscureText = false}) {
+  Future<void> _createAccount() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      _showSnackBar('Please fill all fields');
+      return;
+    }
+
+    if (password.length < 6) {
+      _showSnackBar('Password must be at least 6 characters');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      await BackendService.createUserProfile(
+        uid: userCredential.user!.uid,
+        name: name,
+        email: email,
+      );
+
+      ProfileSession.instance.setProfile(
+        AppUserProfile(
+          name: name,
+          email: email,
+          location: 'Sri Lanka',
+          role: 'NextTrain Premium User',
+          predictions: 0,
+        ),
+      );
+
+      if (!mounted) return;
+      _showSnackBar('Account created successfully');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      _showSnackBar(_mapAuthError(e));
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar('Account creation failed. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _inputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool obscureText = false,
+  }) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
@@ -163,7 +178,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     );
   }
 
-  void _showSnackBar(BuildContext context, String message) {
+  void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: cyan.withValues(alpha: 0.2)),
     );
@@ -178,7 +193,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       case 'weak-password':
         return 'Please choose a stronger password with at least 6 characters.';
       case 'operation-not-allowed':
-        return 'Email/password sign-up is not enabled in Firebase Console. Please enable it in Authentication > Sign-in method.';
+        return 'Email/password sign-up is not enabled in Firebase Console.';
       default:
         return e.message ?? 'Account creation failed';
     }

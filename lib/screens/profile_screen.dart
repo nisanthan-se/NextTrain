@@ -1,10 +1,13 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../utils/color_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../services/profile_session.dart';
+import 'prediction_screen.dart';
+import 'settings_screen.dart';
+import 'sign_in_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,11 +21,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const Color cyan = Color(0xFF00F5FF);
   static const Color purple = Color(0xFFFF00FF);
 
-  String name = 'Loading...';
+  String name = 'Guest';
   String email = '';
   String location = 'Sri Lanka';
-  String role = 'NextTrain Premium User';
+  String role = 'NextTrain User';
   int predictions = 0;
+  bool isSignedIn = false;
 
   StreamSubscription<AppUserProfile?>? _profileSub;
 
@@ -33,34 +37,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _listenToProfile() {
+    final user = FirebaseAuth.instance.currentUser;
+    isSignedIn = user != null;
+
     final cachedProfile = ProfileSession.instance.currentProfile;
     if (cachedProfile != null) {
-      setState(() {
-        name = cachedProfile.name;
-        email = cachedProfile.email;
-        location = cachedProfile.location;
-        role = cachedProfile.role;
-        predictions = cachedProfile.predictions;
-      });
+      _applyProfile(cachedProfile);
+    } else if (user != null) {
+      name = user.displayName ?? user.email?.split('@').first ?? 'User';
+      email = user.email ?? '';
     }
 
-    final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     _profileSub = BackendService.watchCurrentUserProfile().listen((profile) {
       if (!mounted) return;
-
       if (profile != null) {
         ProfileSession.instance.setProfile(profile);
-
-        setState(() {
-          name = profile.name;
-          email = profile.email;
-          location = profile.location;
-          role = profile.role;
-          predictions = profile.predictions;
-        });
+        _applyProfile(profile);
       }
+    });
+  }
+
+  void _applyProfile(AppUserProfile profile) {
+    setState(() {
+      name = profile.name;
+      email = profile.email;
+      location = profile.location;
+      role = profile.role;
+      predictions = profile.predictions;
+      isSignedIn = true;
     });
   }
 
@@ -72,6 +78,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!isSignedIn) {
+      return Scaffold(
+        backgroundColor: bgColor,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.person_outline, color: cyan, size: 72),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Sign in to view your profile',
+                    style: GoogleFonts.poppins(color: Colors.white70, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: cyan),
+                    onPressed: () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const SignInScreen()),
+                        (_) => false,
+                      );
+                    },
+                    child: const Text('Sign In', style: TextStyle(color: Colors.black)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
@@ -86,12 +128,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: cyan, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: cyan.withValues(alpha: 0.25),
-                      blurRadius: 24,
-                    ),
-                  ],
+                  boxShadow: [BoxShadow(color: cyan.withValues(alpha: 0.25), blurRadius: 24)],
                 ),
                 child: const Icon(Icons.person, size: 70, color: cyan),
               ),
@@ -105,21 +142,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                role,
-                style: GoogleFonts.poppins(
-                  color: Colors.white60,
-                  fontSize: 15,
-                ),
-              ),
+              Text(role, style: GoogleFonts.poppins(color: Colors.white60, fontSize: 15)),
               const SizedBox(height: 24),
-              _statsRow(),
+              ValueListenableBuilder<List<PredictionRecord>>(
+                valueListenable: predictionHistoryNotifier,
+                builder: (context, records, _) {
+                  final stats = DashboardStats.fromRecords(records, profilePredictions: predictions);
+                  return Row(
+                    children: [
+                      Expanded(child: _statCard(label: 'Accuracy', value: stats.accuracyLabel, color: cyan)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _statCard(label: 'Predictions', value: stats.predictionsLabel, color: purple)),
+                    ],
+                  );
+                },
+              ),
               const SizedBox(height: 24),
               _infoCard(icon: Icons.email_outlined, title: 'Email', value: email),
               const SizedBox(height: 12),
               _infoCard(icon: Icons.location_on_outlined, title: 'Location', value: location),
               const SizedBox(height: 12),
-              _infoCard(icon: Icons.history, title: 'Predictions', value: '$predictions predictions'),
+              _infoCard(icon: Icons.history, title: 'Total saved', value: '$predictions predictions'),
               const SizedBox(height: 24),
               _actionButton(
                 icon: Icons.edit,
@@ -132,29 +175,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.settings,
                 title: 'Settings',
                 color: purple,
-                onTap: () => _showSnackBar(context, 'Settings coming soon'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               _actionButton(
                 icon: Icons.logout,
                 title: 'Logout',
                 color: Colors.redAccent,
-                onTap: () => _showSnackBar(context, 'You have been logged out'),
+                onTap: () => _logout(context),
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _statsRow() {
-    return Row(
-      children: [
-        Expanded(child: _statCard(label: 'Accuracy', value: '94%', color: cyan)),
-        const SizedBox(width: 12),
-        Expanded(child: _statCard(label: 'Active Trips', value: '12', color: purple)),
-      ],
     );
   }
 
@@ -203,7 +241,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _actionButton({required IconData icon, required String title, required Color color, required VoidCallback onTap}) {
+  Widget _actionButton({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -256,27 +299,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: cyan),
             onPressed: () async {
-              final user = FirebaseAuth.instance.currentUser;
               final currentContext = context;
-              if (user == null) {
+              try {
+                await BackendService.updateProfile(
+                  name: nameController.text.trim().isNotEmpty ? nameController.text.trim() : name,
+                  email: emailController.text.trim().isNotEmpty ? emailController.text.trim() : email,
+                  location: locationController.text.trim().isNotEmpty ? locationController.text.trim() : location,
+                );
+
+                if (!mounted) return;
+                setState(() {
+                  name = nameController.text.trim().isNotEmpty ? nameController.text.trim() : name;
+                  email = emailController.text.trim().isNotEmpty ? emailController.text.trim() : email;
+                  location = locationController.text.trim().isNotEmpty ? locationController.text.trim() : location;
+                });
+                ProfileSession.instance.setProfile(
+                  AppUserProfile(
+                    name: name,
+                    email: email,
+                    location: location,
+                    role: role,
+                    predictions: predictions,
+                  ),
+                );
                 Navigator.pop(currentContext);
-                return;
+                _showSnackBar(currentContext, 'Profile updated');
+              } catch (e) {
+                _showSnackBar(currentContext, 'Could not update profile: $e');
               }
-
-              await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-                'name': nameController.text.trim().isNotEmpty ? nameController.text.trim() : name,
-                'email': emailController.text.trim().isNotEmpty ? emailController.text.trim() : email,
-                'location': locationController.text.trim().isNotEmpty ? locationController.text.trim() : location,
-              });
-
-              if (!mounted) return;
-              setState(() {
-                name = nameController.text.trim().isNotEmpty ? nameController.text.trim() : name;
-                email = emailController.text.trim().isNotEmpty ? emailController.text.trim() : email;
-                location = locationController.text.trim().isNotEmpty ? locationController.text.trim() : location;
-              });
-              Navigator.pop(currentContext);
-              _showSnackBar(currentContext, 'Profile updated');
             },
             child: const Text('Save'),
           ),
@@ -295,6 +345,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
         focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: cyan)),
       ),
+    );
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
+    ProfileSession.instance.clear();
+    predictionHistoryNotifier.value = [];
+
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const SignInScreen()),
+      (_) => false,
     );
   }
 

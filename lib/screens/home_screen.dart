@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import '../utils/color_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../painters/grid_painter.dart';
+import '../services/profile_session.dart';
 import 'prediction_screen.dart';
 import 'assistant_screen.dart';
 import 'profile_screen.dart';
@@ -15,11 +18,27 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int selectedIndex = 0;
+  StreamSubscription<List<PredictionRecord>>? _predictionsSub;
 
   static const Color bgColor = Color(0xFF050B12);
   static const Color cyan = Color(0xFF00F5FF);
   static const Color purple = Color(0xFFFF00FF);
   static const Color yellow = Color(0xFFFFC107);
+
+  @override
+  void initState() {
+    super.initState();
+    _predictionsSub = BackendService.watchPredictions().listen((records) {
+      if (!mounted) return;
+      predictionHistoryNotifier.value = records;
+    });
+  }
+
+  @override
+  void dispose() {
+    _predictionsSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,19 +59,15 @@ class _HomeScreenState extends State<HomeScreen> {
         height: 80,
         decoration: BoxDecoration(
           color: bgColor,
-          border: Border(
-            top: BorderSide(
-              color: cyan.withValues(alpha: 0.15),
-            ),
-          ),
+          border: Border(top: BorderSide(color: cyan.withValues(alpha: 0.15))),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _navItem(Icons.home_outlined, "Home", 0),
-            _navItem(Icons.bolt_outlined, "Predict", 1),
-            _navItem(Icons.smart_toy_outlined, "Assistant", 2),
-            _navItem(Icons.person_outline, "Profile", 3),
+            _navItem(Icons.home_outlined, 'Home', 0),
+            _navItem(Icons.bolt_outlined, 'Predict', 1),
+            _navItem(Icons.smart_toy_outlined, 'Assistant', 2),
+            _navItem(Icons.person_outline, 'Profile', 3),
           ],
         ),
       ),
@@ -65,9 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Positioned.fill(
           child: Opacity(
             opacity: 0.06,
-            child: CustomPaint(
-              painter: GridPainter(),
-            ),
+            child: CustomPaint(painter: const GridPainter(opacity: 0.1)),
           ),
         ),
         SingleChildScrollView(
@@ -76,21 +89,15 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "SRI LANKA RAILWAYS",
-                style: GoogleFonts.orbitron(
-                  color: cyan,
-                  letterSpacing: 3,
-                  fontSize: 15,
-                ),
+                'SRI LANKA RAILWAYS',
+                style: GoogleFonts.orbitron(color: cyan, letterSpacing: 3, fontSize: 15),
               ),
-
               const SizedBox(height: 12),
-
               RichText(
                 text: TextSpan(
                   children: [
                     TextSpan(
-                      text: "Welcome to ",
+                      text: 'Welcome to ',
                       style: GoogleFonts.orbitron(
                         color: Colors.white,
                         fontSize: 28,
@@ -98,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     TextSpan(
-                      text: "NextTrain",
+                      text: 'NextTrain',
                       style: GoogleFonts.orbitron(
                         color: cyan,
                         fontSize: 28,
@@ -108,124 +115,88 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 25),
-
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: cyan.withValues(alpha: 0.25),
-                  ),
+                  border: Border.all(color: cyan.withValues(alpha: 0.25)),
                   color: Colors.white.withValues(alpha: 0.03),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.memory,
-                      color: cyan,
-                    ),
+                    const Icon(Icons.memory, color: cyan),
                     const SizedBox(width: 15),
                     Expanded(
                       child: Text(
-                        "AI Prediction Engine Active",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                        ),
+                        'Smart Delay Estimation Engine Active',
+                        style: GoogleFonts.poppins(color: Colors.white),
                       ),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 30),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _statCard(
-                      cyan,
-                      Icons.check_circle_outline,
-                      "94%",
-                      "Accuracy",
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _statCard(
-                      purple,
-                      Icons.train,
-                      "47",
-                      "Live",
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _statCard(
-                      yellow,
-                      Icons.access_time,
-                      "12m",
-                      "Delay",
-                    ),
-                  ),
-                ],
+              ValueListenableBuilder<List<PredictionRecord>>(
+                valueListenable: predictionHistoryNotifier,
+                builder: (context, records, _) {
+                  final profilePredictions =
+                      ProfileSession.instance.currentProfile?.predictions ?? 0;
+                  final stats = DashboardStats.fromRecords(
+                    records,
+                    profilePredictions: profilePredictions,
+                  );
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _statCard(cyan, Icons.check_circle_outline, stats.accuracyLabel, 'Accuracy'),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _statCard(purple, Icons.analytics_outlined, stats.predictionsLabel, 'Predictions'),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _statCard(yellow, Icons.access_time, stats.avgDelayLabel, 'Avg Delay'),
+                      ),
+                    ],
+                  );
+                },
               ),
-
               const SizedBox(height: 30),
-
               Text(
-                "QUICK ACCESS",
-                style: GoogleFonts.orbitron(
-                  color: Colors.white70,
-                  letterSpacing: 2,
-                ),
+                'QUICK ACCESS',
+                style: GoogleFonts.orbitron(color: Colors.white70, letterSpacing: 2),
               ),
-
               const SizedBox(height: 20),
-
               _featureCard(
                 color: cyan,
                 icon: Icons.bolt,
-                title: "Predict Delay",
-                subtitle: "AI-powered delay prediction",
-                onTap: () {
-                  setState(() {
-                    selectedIndex = 1;
-                  });
-                },
+                title: 'Predict Delay',
+                subtitle: 'Estimate delays from route and conditions',
+                onTap: () => setState(() => selectedIndex = 1),
               ),
-
               const SizedBox(height: 18),
-
               _featureCard(
                 color: purple,
                 icon: Icons.smart_toy,
-                title: "AI Assistant",
-                subtitle: "Chat with railway AI",
+                title: 'AI Assistant',
+                subtitle: 'Chat with railway AI',
+                onTap: () => setState(() => selectedIndex = 2),
+              ),
+              const SizedBox(height: 18),
+              _featureCard(
+                color: yellow,
+                icon: Icons.history,
+                title: 'History',
+                subtitle: 'View previous predictions',
                 onTap: () {
-                  setState(() {
-                    selectedIndex = 2;
-                  });
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                  );
                 },
               ),
-
-              const SizedBox(height: 18),
-
-              _featureCard(
-  color: yellow,
-  icon: Icons.history,
-  title: "History",
-  subtitle: "View previous predictions",
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const HistoryScreen(),
-      ),
-    );
-  },
-),
             ],
           ),
         ),
@@ -233,53 +204,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
-
-  Widget _navItem(
-    IconData icon,
-    String title,
-    int index,
-  ) {
+  Widget _navItem(IconData icon, String title, int index) {
     final active = selectedIndex == index;
-
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedIndex = index;
-        });
-      },
+      onTap: () => setState(() => selectedIndex = index),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            color: active ? cyan : Colors.grey,
-          ),
+          Icon(icon, color: active ? cyan : Colors.grey),
           const SizedBox(height: 5),
-          Text(
-            title,
-            style: TextStyle(
-              color: active ? cyan : Colors.grey,
-            ),
-          ),
+          Text(title, style: TextStyle(color: active ? cyan : Colors.grey)),
         ],
       ),
     );
   }
 
-  Widget _statCard(
-    Color color,
-    IconData icon,
-    String value,
-    String label,
-  ) {
+  Widget _statCard(Color color, IconData icon, String value, String label) {
     return Container(
       height: 120,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
         color: Colors.white.withValues(alpha: 0.03),
       ),
       child: Column(
@@ -289,18 +234,9 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: GoogleFonts.orbitron(
-              color: color,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: GoogleFonts.orbitron(color: color, fontSize: 24, fontWeight: FontWeight.bold),
           ),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white60,
-            ),
-          ),
+          Text(label, style: const TextStyle(color: Colors.white60)),
         ],
       ),
     );
@@ -319,9 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
         height: 120,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(25),
-          border: Border.all(
-            color: color.withValues(alpha: 0.3),
-          ),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
           color: Colors.white.withValues(alpha: 0.03),
         ),
         child: Padding(
@@ -332,10 +266,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center,
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
@@ -346,54 +278,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 5),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Colors.white60,
-                      ),
-                    ),
+                    Text(subtitle, style: const TextStyle(color: Colors.white60)),
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: color,
-              ),
+              Icon(Icons.arrow_forward_ios, color: color),
             ],
           ),
         ),
       ),
     );
   }
-}
-
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color =
-          const Color(0xFF00F5FF).withValues(alpha: 0.1)
-      ..strokeWidth = 0.5;
-
-    const gap = 24.0;
-
-    for (double x = 0; x < size.width; x += gap) {
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
-        paint,
-      );
-    }
-
-    for (double y = 0; y < size.height; y += gap) {
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

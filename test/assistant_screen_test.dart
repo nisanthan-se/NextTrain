@@ -1,10 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:traindelay_app/screens/assistant_screen.dart';
+import 'package:traindelay_app/services/gemini_service.dart';
 
 void main() {
   group('Gemini reply parsing', () {
     test('extracts reply text from a successful Gemini response', () {
-      const responseBody = '{"candidates":[{"content":{"parts":[{"text":"Hello from Gemini"}]}}]}';
+      const responseBody =
+          '{"candidates":[{"content":{"parts":[{"text":"Hello from Gemini"}]}}]}';
 
       expect(extractGeminiReply(responseBody), 'Hello from Gemini');
     });
@@ -14,7 +15,8 @@ void main() {
     });
 
     test('formats Gemini quota errors for users', () {
-      const responseBody = '{"error":{"message":"You exceeded your current quota"}}';
+      const responseBody =
+          '{"error":{"message":"You exceeded your current quota"}}';
 
       expect(
         formatGeminiErrorMessage(429, responseBody),
@@ -23,7 +25,8 @@ void main() {
     });
 
     test('formats invalid API key errors for users', () {
-      const responseBody = '{"error":{"message":"API key not valid. Please pass a valid API key."}}';
+      const responseBody =
+          '{"error":{"message":"API key not valid. Please pass a valid API key."}}';
 
       expect(
         formatGeminiErrorMessage(400, responseBody),

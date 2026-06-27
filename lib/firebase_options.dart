@@ -14,7 +14,15 @@ class DefaultFirebaseOptions {
           storageBucket: 'nexttrain-5cb99.firebasestorage.app',
         );
       case TargetPlatform.iOS:
-        return const FirebaseOptions(
+        return ios;
+      case TargetPlatform.macOS:
+        return ios;
+      default:
+        throw UnsupportedError('DefaultFirebaseOptions are not supported for this platform.');
+    }
+  }
+
+  static const FirebaseOptions ios = FirebaseOptions(
           apiKey: 'AIzaSyBFR1_PUnF3OGxPS46iX9BT9SEwTzBlhTA',
           appId: '1:352499223787:ios:aca5e0edddee628eb9c2ae',
           messagingSenderId: '352499223787',
@@ -22,8 +30,4 @@ class DefaultFirebaseOptions {
           storageBucket: 'nexttrain-5cb99.firebasestorage.app',
           iosBundleId: 'nexttrain',
         );
-      default:
-        throw UnsupportedError('DefaultFirebaseOptions are not supported for this platform.');
-    }
-  }
 }

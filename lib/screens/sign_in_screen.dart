@@ -1,9 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/auth_fallback.dart';
 import '../services/profile_session.dart';
-import '../utils/color_utils.dart';
 import 'create_account_screen.dart';
 import 'home_screen.dart';
 
@@ -18,8 +16,16 @@ class _SignInScreenState extends State<SignInScreen> {
   static const Color bgColor = Color(0xFF050B12);
   static const Color cyan = Color(0xFF00F5FF);
 
-  final TextEditingController _emailController = TextEditingController(text: 'user@example.com');
-  final TextEditingController _passwordController = TextEditingController(text: '123456');
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,122 +49,61 @@ class _SignInScreenState extends State<SignInScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Welcome back to NextTrain',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white60,
-                    fontSize: 15,
-                  ),
+                  style: GoogleFonts.poppins(color: Colors.white60, fontSize: 15),
                 ),
                 const SizedBox(height: 30),
-                _inputField(controller: _emailController, label: 'Email', icon: Icons.email_outlined),
+                _inputField(
+                  controller: _emailController,
+                  label: 'Email',
+                  icon: Icons.email_outlined,
+                ),
                 const SizedBox(height: 16),
-                _inputField(controller: _passwordController, label: 'Password', icon: Icons.lock_outline, obscureText: true),
-                const SizedBox(height: 24),
+                _inputField(
+                  controller: _passwordController,
+                  label: 'Password',
+                  icon: Icons.lock_outline,
+                  obscureText: true,
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _isLoading ? null : _showForgotPasswordDialog,
+                    child: Text('Forgot password?', style: TextStyle(color: cyan)),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () async {
-                      final email = _emailController.text.trim();
-                      final password = _passwordController.text.trim();
-                      final currentContext = context;
-
-                      if (email.isEmpty || password.isEmpty) {
-                        _showSnackBar(currentContext, 'Please enter your email and password');
-                        return;
-                      }
-
-                      try {
-                        final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-                          email: email,
-                          password: password,
-                        );
-
-                        final user = credential.user;
-                        if (user != null) {
-                          ProfileSession.instance.setProfile(
-                            AppUserProfile(
-                              name: user.displayName ?? email.split('@').first,
-                              email: user.email ?? email,
-                              location: 'Sri Lanka',
-                              role: 'NextTrain Premium User',
-                              predictions: 0,
-                            ),
-                          );
-                        }
-
-                        if (!mounted) return;
-                        Navigator.pushReplacement(
-                          currentContext,
-                          MaterialPageRoute(builder: (_) => const HomeScreen()),
-                        );
-                      } on FirebaseAuthException catch (e, st) {
-                        // Log full error for debugging and show a clear message to user
-                        // so they can act (enable sign-in method, check project config).
-                        // Keep fallback behavior for demo flows.
-                        // ignore: avoid_print
-                        print('FirebaseAuthException during sign-in: ${e.code} ${e.message}');
-                        // ignore: avoid_print
-                        print(st);
-
-                        if (!mounted) return;
-                        if (shouldUseDemoAuthFallback(e.message ?? '')) {
-                          Navigator.pushReplacement(
-                            currentContext,
-                            MaterialPageRoute(builder: (_) => const HomeScreen()),
-                          );
-                        } else {
-                          _showSnackBar(currentContext, _mapAuthError(e));
-                          _showErrorDialog(currentContext, 'Sign in failed', e.message ?? 'An error occurred');
-                        }
-                      } catch (e, st) {
-                        // Generic error logging
-                        // ignore: avoid_print
-                        print('Error during sign-in: $e');
-                        // ignore: avoid_print
-                        print(st);
-
-                        if (!mounted) return;
-                        if (shouldUseDemoAuthFallback(e.toString())) {
-                          Navigator.pushReplacement(
-                            currentContext,
-                            MaterialPageRoute(builder: (_) => const HomeScreen()),
-                          );
-                        } else {
-                          _showSnackBar(currentContext, 'Sign in failed');
-                          _showErrorDialog(currentContext, 'Sign in failed', e.toString());
-                        }
-                      }
-                    },
+                    onPressed: _isLoading ? null : _signIn,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: cyan,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     ),
-                    child: Text(
-                      'SIGN IN',
-                      style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                          )
+                        : Text(
+                            'SIGN IN',
+                            style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, color: Colors.black),
+                          ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Expanded(child: Divider(color: Colors.white24)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('or', style: GoogleFonts.poppins(color: Colors.white38)),
-                    ),
-                    const Expanded(child: Divider(color: Colors.white24)),
-                  ],
                 ),
                 const SizedBox(height: 20),
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CreateAccountScreen()),
-                      );
-                    },
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const CreateAccountScreen()),
+                            );
+                          },
                     child: Text('Create account', style: TextStyle(color: cyan)),
                   ),
                 ),
@@ -170,7 +115,102 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  Widget _inputField({required TextEditingController controller, required String label, required IconData icon, bool obscureText = false}) {
+  Future<void> _signIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showSnackBar('Please enter your email and password');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = credential.user;
+      if (user != null) {
+        final profile = await BackendService.getCurrentUserProfile();
+        if (profile != null) {
+          ProfileSession.instance.setProfile(profile);
+        } else {
+          ProfileSession.instance.setProfile(
+            AppUserProfile(
+              name: user.displayName ?? email.split('@').first,
+              email: user.email ?? email,
+              location: 'Sri Lanka',
+              role: 'NextTrain Premium User',
+              predictions: 0,
+            ),
+          );
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      _showSnackBar(_mapAuthError(e));
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar('Sign in failed. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showForgotPasswordDialog() {
+    final emailController = TextEditingController(text: _emailController.text.trim());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: bgColor,
+        title: const Text('Reset password', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: emailController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            labelText: 'Email',
+            labelStyle: const TextStyle(color: Colors.white70),
+            prefixIcon: Icon(Icons.email_outlined, color: cyan),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: cyan),
+            onPressed: () async {
+              final email = emailController.text.trim();
+              if (email.isEmpty) return;
+              try {
+                await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                if (ctx.mounted) Navigator.pop(ctx);
+                _showSnackBar('Password reset email sent');
+              } on FirebaseAuthException catch (e) {
+                _showSnackBar(e.message ?? 'Could not send reset email');
+              }
+            },
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _inputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool obscureText = false,
+  }) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
@@ -186,22 +226,9 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  void _showSnackBar(BuildContext context, String message) {
+  void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: cyan.withValues(alpha: 0.2)),
-    );
-  }
-
-  void _showErrorDialog(BuildContext context, String title, String details) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(details),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
-        ],
-      ),
     );
   }
 
@@ -218,7 +245,7 @@ class _SignInScreenState extends State<SignInScreen> {
       case 'too-many-requests':
         return 'Too many sign-in attempts. Please wait a moment and try again.';
       case 'operation-not-allowed':
-        return 'Email/password sign-in is not enabled in Firebase Console. Please enable it in Authentication > Sign-in method.';
+        return 'Email/password sign-in is not enabled in Firebase Console.';
       default:
         return e.message ?? 'Sign in failed';
     }

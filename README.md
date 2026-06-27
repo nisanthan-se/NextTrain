@@ -1,17 +1,62 @@
-# traindelay_app
+# NextTrain
 
-A new Flutter project.
+AI-powered train delay estimation app for **Sri Lanka Railways**, built with Flutter, Firebase, and Google Gemini.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- Email/password authentication (sign up, sign in, password reset)
+- Smart delay estimation from train, route, weather, and schedule factors
+- Prediction history synced to Firestore (swipe to delete)
+- Gemini AI assistant for railway Q&A
+- User profile and settings (notifications, change password)
 
-A few resources to get you started if this is your first Flutter project:
+## Setup
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+### 1. Flutter
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+export PATH="$HOME/flutter/bin:$PATH"
+flutter pub get
+```
+
+### 2. Firebase
+
+- iOS: `ios/Runner/GoogleService-Info.plist`
+- Android: `android/app/google-services.json`
+- Dart: `lib/firebase_options.dart`
+
+In [Firebase Console](https://console.firebase.google.com/):
+
+1. Enable **Email/Password** under Authentication → Sign-in method
+2. Create a **Firestore** database
+3. Deploy rules: `firebase deploy --only firestore:rules` (see `firestore.rules`)
+
+### 3. Gemini API
+
+Copy `.env.example` to `.env` and add your key from [Google AI Studio](https://aistudio.google.com/apikey):
+
+```env
+GEMINI_API_KEY=your_key_here
+```
+
+## Run
+
+```bash
+flutter run
+```
+
+## Test
+
+```bash
+flutter test
+bash scripts/e2e_verify.sh
+```
+
+## Project structure
+
+| Path | Purpose |
+|------|---------|
+| `lib/screens/` | UI screens |
+| `lib/services/` | Firebase backend, Gemini, session |
+| `lib/config/` | API configuration |
+| `test/e2e/` | Widget and live API tests |

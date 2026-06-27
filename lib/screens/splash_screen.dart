@@ -1,6 +1,11 @@
 import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../utils/color_utils.dart';
+
+import '../painters/grid_painter.dart';
+import '../services/profile_session.dart';
+import 'home_screen.dart';
 import 'sign_in_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -12,27 +17,69 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   double progress = 0.0;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    _startInitialization();
+  }
 
-    Timer.periodic(const Duration(milliseconds: 50), (timer) {
+  Future<void> _startInitialization() async {
+    await FirebaseAuth.instance.authStateChanges().first;
+
+    _timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (!mounted) return;
+
       setState(() {
         progress += 0.01;
       });
 
       if (progress >= 1.0) {
         timer.cancel();
+        _navigateNext();
+      }
+    });
+  }
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const SignInScreen(),
+  Future<void> _navigateNext() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      final profile = await BackendService.getCurrentUserProfile();
+      if (profile != null) {
+        ProfileSession.instance.setProfile(profile);
+      } else {
+        ProfileSession.instance.setProfile(
+          AppUserProfile(
+            name: user.displayName ?? user.email?.split('@').first ?? 'User',
+            email: user.email ?? '',
+            location: 'Sri Lanka',
+            role: 'NextTrain Premium User',
+            predictions: 0,
           ),
         );
       }
-    });
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const SignInScreen()),
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -45,18 +92,13 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: bgColor,
       body: Stack(
         children: [
-          /// Grid Background
           Positioned.fill(
-            child: CustomPaint(
-              painter: GridPainter(),
-            ),
+            child: CustomPaint(painter: const GridPainter(opacity: 0.08, gap: 28)),
           ),
-
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                /// Logo Box
                 Container(
                   height: 140,
                   width: 140,
@@ -79,11 +121,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     size: 70,
                   ),
                 ),
-
                 const SizedBox(height: 40),
-
                 const Text(
-                  "NEXTTRAIN",
+                  'NEXTTRAIN',
                   style: TextStyle(
                     color: cyan,
                     fontSize: 46,
@@ -91,20 +131,16 @@ class _SplashScreenState extends State<SplashScreen> {
                     letterSpacing: 8,
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
                 const Text(
-                  "AI-POWERED TRAIN DELAY PREDICTION",
+                  'AI-POWERED TRAIN DELAY PREDICTION',
                   style: TextStyle(
                     color: purple,
                     fontSize: 14,
                     letterSpacing: 3,
                   ),
                 ),
-
                 const SizedBox(height: 25),
-
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -117,16 +153,14 @@ class _SplashScreenState extends State<SplashScreen> {
                     ),
                   ),
                   child: const Text(
-                    "SRI LANKA RAILWAYS • v2.4.1",
+                    'SRI LANKA RAILWAYS • v1.0.0',
                     style: TextStyle(
                       color: purple,
                       fontSize: 14,
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 120),
-
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 50,
@@ -136,7 +170,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       Row(
                         children: [
                           const Text(
-                            "INITIALIZING AI ENGINE",
+                            'INITIALIZING AI ENGINE',
                             style: TextStyle(
                               color: cyan,
                               fontSize: 14,
@@ -144,7 +178,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           ),
                           const Spacer(),
                           Text(
-                            "${(progress * 100).toInt()}%",
+                            '${(progress * 100).toInt()}%',
                             style: const TextStyle(
                               color: cyan,
                               fontSize: 14,
@@ -152,18 +186,12 @@ class _SplashScreenState extends State<SplashScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 10),
-
                       LinearProgressIndicator(
                         value: progress,
                         minHeight: 6,
-                        backgroundColor:
-                            Colors.white.withValues(alpha: 0.05),
-                        valueColor:
-                            const AlwaysStoppedAnimation(
-                          cyan,
-                        ),
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        valueColor: const AlwaysStoppedAnimation(cyan),
                       ),
                     ],
                   ),
@@ -177,33 +205,3 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF00F5FF)
-          .withValues(alpha: 0.08)
-      ..strokeWidth = 0.5;
-
-    const gap = 28.0;
-
-    for (double x = 0; x < size.width; x += gap) {
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
-        paint,
-      );
-    }
-
-    for (double y = 0; y < size.height; y += gap) {
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
-}
