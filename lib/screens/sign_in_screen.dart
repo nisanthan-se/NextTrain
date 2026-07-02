@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -134,20 +136,23 @@ class _SignInScreenState extends State<SignInScreen> {
 
       final user = credential.user;
       if (user != null) {
-        final profile = await BackendService.getCurrentUserProfile();
-        if (profile != null) {
-          ProfileSession.instance.setProfile(profile);
-        } else {
-          ProfileSession.instance.setProfile(
-            AppUserProfile(
-              name: user.displayName ?? email.split('@').first,
-              email: user.email ?? email,
-              location: 'Sri Lanka',
-              role: 'NextTrain Premium User',
-              predictions: 0,
-            ),
+        AppUserProfile? profile;
+        try {
+          profile = await BackendService.getCurrentUserProfile().timeout(
+            const Duration(seconds: 5),
           );
-        }
+        } catch (_) {}
+
+        ProfileSession.instance.setProfile(
+          profile ??
+              AppUserProfile(
+                name: user.displayName ?? email.split('@').first,
+                email: user.email ?? email,
+                location: 'Sri Lanka',
+                role: 'NextTrain Premium User',
+                predictions: 0,
+              ),
+        );
       }
 
       if (!mounted) return;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -124,11 +126,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         password: password,
       );
 
-      await BackendService.createUserProfile(
-        uid: userCredential.user!.uid,
-        name: name,
-        email: email,
-      );
+      final user = userCredential.user!;
+      try {
+        await user.updateDisplayName(name);
+      } catch (_) {}
 
       ProfileSession.instance.setProfile(
         AppUserProfile(
@@ -141,17 +142,26 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       );
 
       if (!mounted) return;
+      setState(() => _isLoading = false);
       _showSnackBar('Account created successfully');
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+
+      unawaited(
+        BackendService.createUserProfileSafe(
+          uid: user.uid,
+          name: name,
+          email: email,
+        ),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       _showSnackBar(_mapAuthError(e));
     } catch (e) {
       if (!mounted) return;
-      _showSnackBar('Account creation failed. Please try again.');
+      _showSnackBar('Account creation failed: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -194,8 +204,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         return 'Please choose a stronger password with at least 6 characters.';
       case 'operation-not-allowed':
         return 'Email/password sign-up is not enabled in Firebase Console.';
+      case 'network-request-failed':
+        return 'Network error. Check your internet connection and try again.';
+      case 'invalid-api-key':
+      case 'api-key-not-valid':
+        return 'Firebase API key is invalid for web. Check Firebase web app settings.';
       default:
-        return e.message ?? 'Account creation failed';
+        return e.message ?? 'Account creation failed (${e.code})';
     }
   }
 }

@@ -29,24 +29,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isSignedIn = false;
 
   StreamSubscription<AppUserProfile?>? _profileSub;
+  StreamSubscription<User?>? _authSub;
 
   @override
   void initState() {
     super.initState();
-    _listenToProfile();
+    _authSub = FirebaseAuth.instance.authStateChanges().listen(_onAuthChanged);
+    _onAuthChanged(FirebaseAuth.instance.currentUser);
   }
 
-  void _listenToProfile() {
-    final user = FirebaseAuth.instance.currentUser;
-    isSignedIn = user != null;
+  void _onAuthChanged(User? user) {
+    if (!mounted) return;
 
-    final cachedProfile = ProfileSession.instance.currentProfile;
-    if (cachedProfile != null) {
-      _applyProfile(cachedProfile);
-    } else if (user != null) {
-      name = user.displayName ?? user.email?.split('@').first ?? 'User';
-      email = user.email ?? '';
-    }
+    setState(() {
+      isSignedIn = user != null;
+      if (user != null) {
+        final cachedProfile = ProfileSession.instance.currentProfile;
+        if (cachedProfile != null) {
+          name = cachedProfile.name;
+          email = cachedProfile.email;
+          location = cachedProfile.location;
+          role = cachedProfile.role;
+          predictions = cachedProfile.predictions;
+        } else {
+          name = user.displayName ?? user.email?.split('@').first ?? 'User';
+          email = user.email ?? '';
+        }
+      }
+    });
+
+    _profileSub?.cancel();
+    _profileSub = null;
 
     if (user == null) return;
 
@@ -72,6 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _profileSub?.cancel();
     super.dispose();
   }

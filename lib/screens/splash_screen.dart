@@ -17,7 +17,6 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   double progress = 0.0;
-  Timer? _timer;
 
   @override
   void initState() {
@@ -26,40 +25,42 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _startInitialization() async {
-    await FirebaseAuth.instance.authStateChanges().first;
+    setState(() => progress = 0.2);
 
-    _timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      if (!mounted) return;
+    // Wait for Firebase Auth to settle, but don't hang forever.
+    try {
+      await FirebaseAuth.instance.authStateChanges().first.timeout(
+        const Duration(seconds: 2),
+      );
+    } catch (_) {}
 
-      setState(() {
-        progress += 0.01;
-      });
+    if (!mounted) return;
+    setState(() => progress = 0.7);
 
-      if (progress >= 1.0) {
-        timer.cancel();
-        _navigateNext();
-      }
-    });
+    // Brief branded splash only — no artificial 5s delay.
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    if (!mounted) return;
+    setState(() => progress = 1.0);
+    await _navigateNext();
   }
 
   Future<void> _navigateNext() async {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user != null) {
-      final profile = await BackendService.getCurrentUserProfile();
-      if (profile != null) {
-        ProfileSession.instance.setProfile(profile);
-      } else {
-        ProfileSession.instance.setProfile(
-          AppUserProfile(
-            name: user.displayName ?? user.email?.split('@').first ?? 'User',
-            email: user.email ?? '',
-            location: 'Sri Lanka',
-            role: 'NextTrain Premium User',
-            predictions: 0,
-          ),
-        );
-      }
+      ProfileSession.instance.setProfile(
+        AppUserProfile(
+          name: user.displayName ?? user.email?.split('@').first ?? 'User',
+          email: user.email ?? '',
+          location: 'Sri Lanka',
+          role: 'NextTrain Premium User',
+          predictions: 0,
+        ),
+      );
+
+      // Load full profile in the background — don't block the UI.
+      unawaited(_refreshProfileInBackground());
 
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -76,10 +77,15 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+  Future<void> _refreshProfileInBackground() async {
+    try {
+      final profile = await BackendService.getCurrentUserProfile().timeout(
+        const Duration(seconds: 3),
+      );
+      if (profile != null) {
+        ProfileSession.instance.setProfile(profile);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -104,22 +110,12 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: 140,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: cyan.withValues(alpha: 0.4),
-                      width: 2,
-                    ),
+                    border: Border.all(color: cyan.withValues(alpha: 0.4), width: 2),
                     boxShadow: [
-                      BoxShadow(
-                        color: cyan.withValues(alpha: 0.3),
-                        blurRadius: 30,
-                      ),
+                      BoxShadow(color: cyan.withValues(alpha: 0.3), blurRadius: 30),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.train,
-                    color: cyan,
-                    size: 70,
-                  ),
+                  child: const Icon(Icons.train, color: cyan, size: 70),
                 ),
                 const SizedBox(height: 40),
                 const Text(
@@ -134,55 +130,35 @@ class _SplashScreenState extends State<SplashScreen> {
                 const SizedBox(height: 15),
                 const Text(
                   'AI-POWERED TRAIN DELAY PREDICTION',
-                  style: TextStyle(
-                    color: purple,
-                    fontSize: 14,
-                    letterSpacing: 3,
-                  ),
+                  style: TextStyle(color: purple, fontSize: 14, letterSpacing: 3),
                 ),
                 const SizedBox(height: 25),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: purple.withValues(alpha: 0.5),
-                    ),
+                    border: Border.all(color: purple.withValues(alpha: 0.5)),
                   ),
                   child: const Text(
                     'SRI LANKA RAILWAYS • v1.0.0',
-                    style: TextStyle(
-                      color: purple,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: purple, fontSize: 14),
                   ),
                 ),
                 const SizedBox(height: 120),
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 50,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 50),
                   child: Column(
                     children: [
                       Row(
                         children: [
                           const Text(
-                            'INITIALIZING AI ENGINE',
-                            style: TextStyle(
-                              color: cyan,
-                              fontSize: 14,
-                            ),
+                            'LOADING',
+                            style: TextStyle(color: cyan, fontSize: 14),
                           ),
                           const Spacer(),
                           Text(
                             '${(progress * 100).toInt()}%',
-                            style: const TextStyle(
-                              color: cyan,
-                              fontSize: 14,
-                            ),
+                            style: const TextStyle(color: cyan, fontSize: 14),
                           ),
                         ],
                       ),
@@ -204,4 +180,3 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-
