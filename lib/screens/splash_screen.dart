@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../painters/grid_painter.dart';
 import '../services/profile_session.dart';
-import 'home_screen.dart';
+import '../utils/auth_navigation.dart';
 import 'sign_in_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -63,10 +63,7 @@ class _SplashScreenState extends State<SplashScreen> {
       unawaited(_refreshProfileInBackground());
 
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      await goToMainApp(context);
       return;
     }
 
@@ -99,7 +96,9 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: CustomPaint(painter: const GridPainter(opacity: 0.08, gap: 28)),
+            child: CustomPaint(
+              painter: const GridPainter(opacity: 0.08, gap: 28),
+            ),
           ),
           Center(
             child: Column(
@@ -110,9 +109,15 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: 140,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: cyan.withValues(alpha: 0.4), width: 2),
+                    border: Border.all(
+                      color: cyan.withValues(alpha: 0.4),
+                      width: 2,
+                    ),
                     boxShadow: [
-                      BoxShadow(color: cyan.withValues(alpha: 0.3), blurRadius: 30),
+                      BoxShadow(
+                        color: cyan.withValues(alpha: 0.3),
+                        blurRadius: 30,
+                      ),
                     ],
                   ),
                   child: const Icon(Icons.train, color: cyan, size: 70),
@@ -130,11 +135,18 @@ class _SplashScreenState extends State<SplashScreen> {
                 const SizedBox(height: 15),
                 const Text(
                   'AI-POWERED TRAIN DELAY PREDICTION',
-                  style: TextStyle(color: purple, fontSize: 14, letterSpacing: 3),
+                  style: TextStyle(
+                    color: purple,
+                    fontSize: 14,
+                    letterSpacing: 3,
+                  ),
                 ),
                 const SizedBox(height: 25),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: purple.withValues(alpha: 0.5)),

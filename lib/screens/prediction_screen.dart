@@ -6,6 +6,76 @@ import '../services/backend_service.dart';
 final ValueNotifier<List<PredictionRecord>> predictionHistoryNotifier =
     ValueNotifier<List<PredictionRecord>>([]);
 
+class PredictionInsight {
+  final int delayMinutes;
+  final String riskLabel;
+  final int confidence;
+  final String recommendation;
+
+  const PredictionInsight({
+    required this.delayMinutes,
+    required this.riskLabel,
+    required this.confidence,
+    required this.recommendation,
+  });
+}
+
+String buildPredictionExplanation({
+  required String trainName,
+  required String route,
+  required String day,
+  required String holiday,
+  required String weather,
+  required dynamic temperature,
+}) {
+  final temp = temperature is int
+      ? temperature
+      : int.tryParse(temperature.toString()) ?? 28;
+
+  return 'Analyzing $trainName on $route route for $day with holiday=$holiday, weather=$weather, temperature=$temp°C.';
+}
+
+PredictionInsight buildPredictionInsight({
+  required String trainName,
+  required String route,
+  required String day,
+  required String holiday,
+  required String weather,
+  required dynamic temperature,
+}) {
+  final delay = calculateEstimatedDelay(
+    trainName: trainName,
+    route: route,
+    day: day,
+    holiday: holiday,
+    weather: weather,
+    temperature: temperature,
+  );
+
+  String riskLabel = 'Low';
+  String recommendation = 'Service should remain mostly on schedule.';
+  int confidence = 84;
+
+  if (delay >= 25) {
+    riskLabel = 'High';
+    recommendation = 'Expect strong disruption. Allow extra buffer before departure.';
+    confidence = 92;
+  } else if (delay >= 15) {
+    riskLabel = 'Medium';
+    recommendation = 'A moderate delay is likely. Plan for a slight change in arrival time.';
+    confidence = 88;
+  } else {
+    recommendation = 'Conditions look manageable. The service should stay close to plan.';
+  }
+
+  return PredictionInsight(
+    delayMinutes: delay,
+    riskLabel: riskLabel,
+    confidence: confidence,
+    recommendation: recommendation,
+  );
+}
+
 int calculateEstimatedDelay({
   required String trainName,
   required String route,
@@ -153,7 +223,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
                       "Udarata Menike",
                       "Yal Devi",
                       "Podi Menike",
-                      "Ruhunu Kumari"
+                      "Ruhunu Kumari",
+                      "Senkadagala Menike"
                     ],
                     onChanged: (v) {
                       setState(() {
@@ -175,7 +246,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
                       "Colombo → Kandy",
                       "Colombo → Jaffna",
                       "Colombo → Galle",
-                      "Kandy → Badulla"
+                      "Kandy → Badulla",
+                      "Colombo → Batticaloa"
                     ],
                     onChanged: (v) {
                       setState(() {
@@ -274,7 +346,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
                                 "Sunny",
                                 "Cloudy",
                                 "Partly Cloudy",
-                                "Rainy"
+                                "Rainy",
+                                "Stormy",
+                                "Foggy"
                               ],
                               onChanged: (v) {
                                 setState(() {
@@ -312,10 +386,89 @@ class _PredictionScreenState extends State<PredictionScreen> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          "Analyzing $selectedTrain on $selectedRoute route with $weather conditions at ${tempController.text}°C...",
+                          buildPredictionExplanation(
+                            trainName: selectedTrain,
+                            route: selectedRoute,
+                            day: selectedDay,
+                            holiday: holiday,
+                            weather: weather,
+                            temperature: tempController.text,
+                          ),
                           style: GoogleFonts.poppins(
                             color: Colors.white70,
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        Builder(
+                          builder: (context) {
+                            final insight = buildPredictionInsight(
+                              trainName: selectedTrain,
+                              route: selectedRoute,
+                              day: selectedDay,
+                              holiday: holiday,
+                              weather: weather,
+                              temperature: tempController.text,
+                            );
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Estimated delay: ${insight.delayMinutes} min',
+                                      style: GoogleFonts.orbitron(
+                                        color: cyan,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: insight.riskLabel == 'High'
+                                            ? Colors.redAccent.withValues(alpha: 0.2)
+                                            : insight.riskLabel == 'Medium'
+                                                ? Colors.orange.withValues(alpha: 0.2)
+                                                : Colors.green.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        insight.riskLabel,
+                                        style: const TextStyle(color: Colors.white),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: LinearProgressIndicator(
+                                    value: (insight.delayMinutes / 60).clamp(0.0, 1.0),
+                                    minHeight: 8,
+                                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      insight.riskLabel == 'High'
+                                          ? Colors.redAccent
+                                          : insight.riskLabel == 'Medium'
+                                              ? Colors.orange
+                                              : Colors.greenAccent,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Confidence: ${insight.confidence}%',
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  insight.recommendation,
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),

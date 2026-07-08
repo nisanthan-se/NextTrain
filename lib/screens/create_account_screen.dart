@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/profile_session.dart';
-import 'home_screen.dart';
+import '../utils/auth_navigation.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -60,12 +60,23 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Join NextTrain and start predicting delays',
-                  style: GoogleFonts.poppins(color: Colors.white60, fontSize: 15),
+                  style: GoogleFonts.poppins(
+                    color: Colors.white60,
+                    fontSize: 15,
+                  ),
                 ),
                 const SizedBox(height: 28),
-                _inputField(controller: _nameController, label: 'Name', icon: Icons.person_outline),
+                _inputField(
+                  controller: _nameController,
+                  label: 'Name',
+                  icon: Icons.person_outline,
+                ),
                 const SizedBox(height: 14),
-                _inputField(controller: _emailController, label: 'Email', icon: Icons.email_outlined),
+                _inputField(
+                  controller: _emailController,
+                  label: 'Email',
+                  icon: Icons.email_outlined,
+                ),
                 const SizedBox(height: 14),
                 _inputField(
                   controller: _passwordController,
@@ -81,17 +92,25 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     onPressed: _isLoading ? null : _createAccount,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: cyan,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
                     ),
                     child: _isLoading
                         ? const SizedBox(
                             height: 22,
                             width: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
                           )
                         : Text(
                             'CREATE ACCOUNT',
-                            style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, color: Colors.black),
+                            style: GoogleFonts.orbitron(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
                           ),
                   ),
                 ),
@@ -121,10 +140,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       final user = userCredential.user!;
       try {
@@ -144,10 +161,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       _showSnackBar('Account created successfully');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      await goToMainApp(context);
 
       unawaited(
         BackendService.createUserProfileSafe(
@@ -183,14 +197,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         labelStyle: const TextStyle(color: Colors.white70),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.04),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: cyan.withValues(alpha: 0.2)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: cyan.withValues(alpha: 0.2),
+      ),
     );
   }
 
