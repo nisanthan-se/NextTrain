@@ -23,4 +23,26 @@ void main() {
       expect(restored.predictions, 4);
     });
   });
+
+  group('PredictionRecord', () {
+    test('serializes prediction records for Firestore', () {
+      const record = PredictionRecord(
+        trainName: 'Yal Devi',
+        route: 'Colombo → Jaffna',
+        delayMinutes: 18,
+        date: 'Just now',
+        accuracy: '95%',
+      );
+
+      final data = record.toFirestoreMap();
+      final restored = PredictionRecord.fromFirestoreMap('abc123', {
+        ...data,
+        'createdAt': null,
+      });
+
+      expect(data['trainName'], 'Yal Devi');
+      expect(restored.trainName, 'Yal Devi');
+      expect(restored.delayMinutes, 18);
+    });
+  });
 }

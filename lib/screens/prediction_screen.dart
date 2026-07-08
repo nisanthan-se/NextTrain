@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../utils/color_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../painters/grid_painter.dart';
 import '../services/backend_service.dart';
 
 final ValueNotifier<List<PredictionRecord>> predictionHistoryNotifier =
@@ -57,35 +57,25 @@ class PredictionScreen extends StatefulWidget {
   State<PredictionScreen> createState() => _PredictionScreenState();
 }
 
-class PredictionRecord {
-  final String trainName;
-  final String route;
-  final int delayMinutes;
-  final String date;
-  final String accuracy;
-
-  const PredictionRecord({
-    required this.trainName,
-    required this.route,
-    required this.delayMinutes,
-    required this.date,
-    required this.accuracy,
-  });
-}
-
 class _PredictionScreenState extends State<PredictionScreen> {
   static const Color bgColor = Color(0xFF050B12);
   static const Color cyan = Color(0xFF00F5FF);
   static const Color purple = Color(0xFFFF00FF);
 
-  String selectedTrain = "Udarata Menike";
-  String selectedRoute = "Colombo → Kandy";
-  String selectedDay = "Wednesday";
-  String holiday = "No";
-  String weather = "Partly Cloudy";
+  String selectedTrain = 'Udarata Menike';
+  String selectedRoute = 'Colombo → Kandy';
+  String selectedDay = 'Wednesday';
+  String holiday = 'No';
+  String weather = 'Partly Cloudy';
 
   final TextEditingController tempController =
-      TextEditingController(text: "28");
+      TextEditingController(text: '28');
+
+  @override
+  void dispose() {
+    tempController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +87,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
             child: Opacity(
               opacity: .08,
               child: CustomPaint(
-                painter: GridPainter(),
+                painter: const GridPainter(opacity: 0.08, gap: 22),
               ),
             ),
           ),
@@ -146,10 +136,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
                   const SizedBox(height: 8),
 
                   Text(
-                    "AI Powered Real-Time Forecasting",
-                    style: GoogleFonts.poppins(
-                      color: Colors.white54,
-                    ),
+                    'Smart delay estimation from route, weather, and schedule factors',
+                    style: GoogleFonts.poppins(color: Colors.white54),
                   ),
 
                   const SizedBox(height: 30),
@@ -350,21 +338,39 @@ class _PredictionScreenState extends State<PredictionScreen> {
                         );
 
                         final currentContext = context;
+                        final record = PredictionRecord(
+                          trainName: selectedTrain,
+                          route: selectedRoute,
+                          delayMinutes: estimatedDelay,
+                          date: 'Just now',
+                          accuracy: '${90 + (estimatedDelay % 5)}%',
+                        );
 
-                        setState(() {
-                          predictionHistoryNotifier.value = [
-                            PredictionRecord(
-                              trainName: selectedTrain,
-                              route: selectedRoute,
-                              delayMinutes: estimatedDelay,
-                              date: 'Just now',
-                              accuracy: '${90 + (estimatedDelay % 5)}%',
-                            ),
-                            ...predictionHistoryNotifier.value,
-                          ];
-                        });
-
-                        await BackendService.incrementPredictionCount();
+                        var savedMessage = 'Sign in to save this prediction to your history.';
+                        if (BackendService.currentUser != null) {
+                          try {
+                            await BackendService.savePredictionAndIncrement(record);
+                            if (!mounted) return;
+                            setState(() {
+                              predictionHistoryNotifier.value = [
+                                record,
+                                ...predictionHistoryNotifier.value,
+                              ];
+                            });
+                            savedMessage = 'Saved to your history.';
+                          } on BackendException catch (e) {
+                            savedMessage = e.message;
+                          } catch (_) {
+                            savedMessage = 'Could not save to cloud. Showing estimate only.';
+                          }
+                        } else {
+                          setState(() {
+                            predictionHistoryNotifier.value = [
+                              record,
+                              ...predictionHistoryNotifier.value,
+                            ];
+                          });
+                        }
 
                         if (!mounted) return;
                         showDialog(
@@ -372,17 +378,19 @@ class _PredictionScreenState extends State<PredictionScreen> {
                           builder: (_) => AlertDialog(
                             backgroundColor: bgColor,
                             title: const Text(
-                              "Prediction Result",
-                              style: TextStyle(
-                                color: Colors.white,
-                              ),
+                              'Prediction Result',
+                              style: TextStyle(color: Colors.white),
                             ),
                             content: Text(
-                              "Estimated Delay: $estimatedDelay Minutes",
-                              style: const TextStyle(
-                                color: Colors.white70,
-                              ),
+                              'Estimated Delay: $estimatedDelay minutes\n\n$savedMessage',
+                              style: const TextStyle(color: Colors.white70),
                             ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(currentContext),
+                                child: Text('OK', style: TextStyle(color: cyan)),
+                              ),
+                            ],
                           ),
                         );
                       },
@@ -478,28 +486,4 @@ class _PredictionScreenState extends State<PredictionScreen> {
       ),
     );
   }
-}
-
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF00F5FF).withValues(alpha: 0.08)
-      ..strokeWidth = 0.5;
-
-    const gap = 22.0;
-
-    for (double x = 0; x < size.width; x += gap) {
-      canvas.drawLine(
-          Offset(x, 0), Offset(x, size.height), paint);
-    }
-
-    for (double y = 0; y < size.height; y += gap) {
-      canvas.drawLine(
-          Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
