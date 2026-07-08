@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -165,7 +167,25 @@ class BackendService {
     }
   }
 
+  static Future<void> _ensureFirestoreOnline() async {
+    try {
+      await _firestore.enableNetwork();
+    } catch (_) {}
+  }
+
   static Future<void> createUserProfile({
+    required String uid,
+    required String name,
+    required String email,
+  }) async {
+    final synced = await createUserProfileSafe(uid: uid, name: name, email: email);
+    if (!synced) {
+      throw BackendException('Could not save profile to cloud storage.');
+    }
+  }
+
+  /// Saves the user profile to Firestore. Returns false if sync fails (e.g. offline on web).
+  static Future<bool> createUserProfileSafe({
     required String uid,
     required String name,
     required String email,
@@ -178,7 +198,25 @@ class BackendService {
       predictions: 0,
     );
 
-    await _firestore.collection('users').doc(uid).set(profile.toFirestoreMap());
+    await _ensureFirestoreOnline();
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await _firestore
+            .collection('users')
+            .doc(uid)
+            .set(profile.toFirestoreMap())
+            .timeout(const Duration(seconds: 5));
+        return true;
+      } catch (_) {
+        if (attempt == 0) {
+          await _ensureFirestoreOnline();
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+        }
+      }
+    }
+
+    return false;
   }
 
   static Future<AppUserProfile?> getCurrentUserProfile() async {
@@ -200,7 +238,7 @@ class BackendService {
     return _firestore.collection('users').doc(user.uid).snapshots().map((snapshot) {
       if (!snapshot.exists) return null;
       return AppUserProfile.fromFirestoreMap(snapshot.data()!);
-    });
+    }).handleError((_) {});
   }
 
   static Future<void> updateProfile({
@@ -281,6 +319,6 @@ class BackendService {
             ),
           )
           .toList();
-    });
+    }).handleError((_) {});
   }
 }

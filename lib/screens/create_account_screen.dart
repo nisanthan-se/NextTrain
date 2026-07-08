@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/profile_session.dart';
-import 'home_screen.dart';
+import '../utils/auth_navigation.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -58,12 +60,23 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Join NextTrain and start predicting delays',
-                  style: GoogleFonts.poppins(color: Colors.white60, fontSize: 15),
+                  style: GoogleFonts.poppins(
+                    color: Colors.white60,
+                    fontSize: 15,
+                  ),
                 ),
                 const SizedBox(height: 28),
-                _inputField(controller: _nameController, label: 'Name', icon: Icons.person_outline),
+                _inputField(
+                  controller: _nameController,
+                  label: 'Name',
+                  icon: Icons.person_outline,
+                ),
                 const SizedBox(height: 14),
-                _inputField(controller: _emailController, label: 'Email', icon: Icons.email_outlined),
+                _inputField(
+                  controller: _emailController,
+                  label: 'Email',
+                  icon: Icons.email_outlined,
+                ),
                 const SizedBox(height: 14),
                 _inputField(
                   controller: _passwordController,
@@ -79,17 +92,25 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     onPressed: _isLoading ? null : _createAccount,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: cyan,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
                     ),
                     child: _isLoading
                         ? const SizedBox(
                             height: 22,
                             width: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
                           )
                         : Text(
                             'CREATE ACCOUNT',
-                            style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, color: Colors.black),
+                            style: GoogleFonts.orbitron(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
                           ),
                   ),
                 ),
@@ -119,16 +140,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
 
-      await BackendService.createUserProfile(
-        uid: userCredential.user!.uid,
-        name: name,
-        email: email,
-      );
+      final user = userCredential.user!;
+      try {
+        await user.updateDisplayName(name);
+      } catch (_) {}
 
       ProfileSession.instance.setProfile(
         AppUserProfile(
@@ -141,17 +159,23 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       );
 
       if (!mounted) return;
+      setState(() => _isLoading = false);
       _showSnackBar('Account created successfully');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      await goToMainApp(context);
+
+      unawaited(
+        BackendService.createUserProfileSafe(
+          uid: user.uid,
+          name: name,
+          email: email,
+        ),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       _showSnackBar(_mapAuthError(e));
     } catch (e) {
       if (!mounted) return;
-      _showSnackBar('Account creation failed. Please try again.');
+      _showSnackBar('Account creation failed: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -173,14 +197,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         labelStyle: const TextStyle(color: Colors.white70),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.04),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: cyan.withValues(alpha: 0.2)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: cyan.withValues(alpha: 0.2),
+      ),
     );
   }
 
@@ -194,8 +224,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         return 'Please choose a stronger password with at least 6 characters.';
       case 'operation-not-allowed':
         return 'Email/password sign-up is not enabled in Firebase Console.';
+      case 'network-request-failed':
+        return 'Network error. Check your internet connection and try again.';
+      case 'invalid-api-key':
+      case 'api-key-not-valid':
+        return 'Firebase API key is invalid for web. Check Firebase web app settings.';
       default:
-        return e.message ?? 'Account creation failed';
+        return e.message ?? 'Account creation failed (${e.code})';
     }
   }
 }

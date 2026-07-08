@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/profile_session.dart';
+import '../utils/auth_navigation.dart';
 import 'create_account_screen.dart';
-import 'home_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -49,7 +51,10 @@ class _SignInScreenState extends State<SignInScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Welcome back to NextTrain',
-                  style: GoogleFonts.poppins(color: Colors.white60, fontSize: 15),
+                  style: GoogleFonts.poppins(
+                    color: Colors.white60,
+                    fontSize: 15,
+                  ),
                 ),
                 const SizedBox(height: 30),
                 _inputField(
@@ -68,7 +73,10 @@ class _SignInScreenState extends State<SignInScreen> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: _isLoading ? null : _showForgotPasswordDialog,
-                    child: Text('Forgot password?', style: TextStyle(color: cyan)),
+                    child: Text(
+                      'Forgot password?',
+                      style: TextStyle(color: cyan),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -79,17 +87,25 @@ class _SignInScreenState extends State<SignInScreen> {
                     onPressed: _isLoading ? null : _signIn,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: cyan,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
                     ),
                     child: _isLoading
                         ? const SizedBox(
                             height: 22,
                             width: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
                           )
                         : Text(
                             'SIGN IN',
-                            style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, color: Colors.black),
+                            style: GoogleFonts.orbitron(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
                           ),
                   ),
                 ),
@@ -101,10 +117,15 @@ class _SignInScreenState extends State<SignInScreen> {
                         : () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const CreateAccountScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => const CreateAccountScreen(),
+                              ),
                             );
                           },
-                    child: Text('Create account', style: TextStyle(color: cyan)),
+                    child: Text(
+                      'Create account',
+                      style: TextStyle(color: cyan),
+                    ),
                   ),
                 ),
               ],
@@ -134,27 +155,27 @@ class _SignInScreenState extends State<SignInScreen> {
 
       final user = credential.user;
       if (user != null) {
-        final profile = await BackendService.getCurrentUserProfile();
-        if (profile != null) {
-          ProfileSession.instance.setProfile(profile);
-        } else {
-          ProfileSession.instance.setProfile(
-            AppUserProfile(
-              name: user.displayName ?? email.split('@').first,
-              email: user.email ?? email,
-              location: 'Sri Lanka',
-              role: 'NextTrain Premium User',
-              predictions: 0,
-            ),
+        AppUserProfile? profile;
+        try {
+          profile = await BackendService.getCurrentUserProfile().timeout(
+            const Duration(seconds: 5),
           );
-        }
+        } catch (_) {}
+
+        ProfileSession.instance.setProfile(
+          profile ??
+              AppUserProfile(
+                name: user.displayName ?? email.split('@').first,
+                email: user.email ?? email,
+                location: 'Sri Lanka',
+                role: 'NextTrain Premium User',
+                predictions: 0,
+              ),
+        );
       }
 
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      await goToMainApp(context);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       _showSnackBar(_mapAuthError(e));
@@ -167,13 +188,18 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   void _showForgotPasswordDialog() {
-    final emailController = TextEditingController(text: _emailController.text.trim());
+    final emailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: bgColor,
-        title: const Text('Reset password', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Reset password',
+          style: TextStyle(color: Colors.white),
+        ),
         content: TextField(
           controller: emailController,
           style: const TextStyle(color: Colors.white),
@@ -184,14 +210,19 @@ class _SignInScreenState extends State<SignInScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: cyan),
             onPressed: () async {
               final email = emailController.text.trim();
               if (email.isEmpty) return;
               try {
-                await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                await FirebaseAuth.instance.sendPasswordResetEmail(
+                  email: email,
+                );
                 if (ctx.mounted) Navigator.pop(ctx);
                 _showSnackBar('Password reset email sent');
               } on FirebaseAuthException catch (e) {
@@ -221,14 +252,20 @@ class _SignInScreenState extends State<SignInScreen> {
         labelStyle: const TextStyle(color: Colors.white70),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.04),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: cyan.withValues(alpha: 0.2)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: cyan.withValues(alpha: 0.2),
+      ),
     );
   }
 
